@@ -1,55 +1,84 @@
-"""Draft a plain-English summary of a profiled, cleaned dataset.
+"""Draft a plain-English summary of a profiled, cleaned dataset using a
+local Ollama model. No external provider, no API key, no data leaving
+your machine -- narrate() talks to a local Ollama server the same way
+the `ollama` CLI's own HTTP client would, using nothing but the
+standard library.
 
 Deliberately narrow: the model only ever sees aggregate statistics --
 column names, dtypes, counts, summary stats, and what the cleaning
-pipeline changed -- never the raw rows. A dataset worth running through
-this tool in the first place is exactly the kind that might contain
-something sensitive; there's no reason the narration step needs to see
-it to describe it.
+pipeline changed -- never the raw rows.
 
-Optional end to end: construct a Narrator with no API key and narrate()
-just returns None. Nothing else in glance depends on this module running.
+Optional end to end: construct a Narrator with no model name and
+narrate() just returns None. Nothing else in glance depends on this
+module running.
 """
 
 from __future__ import annotations
 
+import json
+import urllib.error
+import urllib.request
+
 from glance.cleaning import CleaningReport
 from glance.profiling import ColumnProfile, DatasetProfile
 
-_MODEL = "claude-haiku-4-5-20251001"
-_MAX_TOKENS = 500
+_DEFAULT_HOST = "http://localhost:11434"
+_TIMEOUT_SECONDS = 120
+
+
+class OllamaUnavailableError(RuntimeError):
+    """Raised when a model was configured but the local Ollama server
+    couldn't be reached, or returned an error (e.g. the model hasn't
+    been pulled)."""
 
 
 class Narrator:
-    def __init__(self, api_key: str | None = None) -> None:
-        self._client = None
-        if api_key:
-            # Imported lazily: the anthropic package is an optional
-            # extra, and most uses of glance never touch this path.
-            from anthropic import Anthropic
-
-            self._client = Anthropic(api_key=api_key)
+    def __init__(self, model: str | None = None, host: str = _DEFAULT_HOST) -> None:
+        self._model = model
+        self._host = host.rstrip("/")
 
     @property
     def enabled(self) -> bool:
-        return self._client is not None
+        return self._model is not None
 
     def narrate(self, profile: DatasetProfile, cleaning_report: CleaningReport) -> str | None:
-        """Return a short plain-English summary, or None if no API key
-        was configured. Network/API errors are the caller's problem to
-        decide how to handle -- they aren't swallowed here, since a
-        silent narration failure would be confusing (was there nothing
-        to say, or did the call fail?).
+        """Return a short plain-English summary, or None if no model
+        was configured. Raises OllamaUnavailableError if a model *was*
+        configured but the server couldn't be reached -- that's the
+        caller's call to make (fail loudly, or fall back silently),
+        not something to swallow here.
         """
-        if self._client is None:
+        if self._model is None:
             return None
 
-        response = self._client.messages.create(
-            model=_MODEL,
-            max_tokens=_MAX_TOKENS,
-            messages=[{"role": "user", "content": build_prompt(profile, cleaning_report)}],
+        payload = json.dumps(
+            {
+                "model": self._model,
+                "prompt": build_prompt(profile, cleaning_report),
+                "stream": False,
+            }
+        ).encode()
+        request = urllib.request.Request(
+            f"{self._host}/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
-        return _extract_text(response)
+
+        try:
+            with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+                body = json.loads(response.read())
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode(errors="replace")
+            raise OllamaUnavailableError(
+                f"Ollama at {self._host} returned {exc.code} for model {self._model!r}: {detail}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise OllamaUnavailableError(
+                f"couldn't reach Ollama at {self._host} -- is it running? ({exc.reason})"
+            ) from exc
+
+        return body["response"].strip()
 
 
 def build_prompt(profile: DatasetProfile, cleaning_report: CleaningReport) -> str:
@@ -87,10 +116,3 @@ def _describe_column(col: ColumnProfile) -> str:
         top = ", ".join(f"{value!r}: {count}" for value, count in col.top_values)
         parts.append(f"top values: {top}")
     return "; ".join(parts)
-
-
-def _extract_text(response) -> str:
-    for block in response.content:
-        if getattr(block, "type", None) == "text":
-            return block.text
-    return ""

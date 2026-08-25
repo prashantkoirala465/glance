@@ -15,11 +15,18 @@ at the top of every new notebook.
 pip install glance
 ```
 
-Excel support and AI narration are optional extras:
+Excel support is an optional extra:
 
 ```bash
 pip install "glance[excel]"    # .xlsx / .xls
-pip install "glance[narrate]"  # --narrate
+```
+
+`--narrate` needs [Ollama](https://ollama.com) running locally — no
+extra Python dependency, no API key, nothing leaves your machine:
+
+```bash
+brew install ollama        # or see ollama.com for other platforms
+ollama pull llama3.2       # any model works; smaller ones are faster
 ```
 
 ## Quickstart
@@ -43,13 +50,19 @@ whitespace, missing values, one clear outlier):
 glance examples/messy_sales.csv
 ```
 
-Add `--narrate` for a short AI-written summary paragraph at the top of
-the report (requires `pip install "glance[narrate]"` and an API key,
-either `--api-key` or the `ANTHROPIC_API_KEY` environment variable):
+Add `--narrate` with a model name for a short AI-written summary
+paragraph at the top of the report (needs Ollama running locally, see
+above):
 
 ```bash
-glance data.csv --narrate
+glance data.csv --narrate llama3.2
 ```
+
+If Ollama isn't running, or the model isn't pulled, glance prints a
+clear warning and still writes the rest of the report — narration is
+the one optional piece, everything else works regardless. Point at a
+non-default Ollama install with `--ollama-host` or the `OLLAMA_HOST`
+environment variable.
 
 Missing values are filled with the column's median/mode by default.
 Pass `--missing-strategy drop` to drop incomplete rows instead.
@@ -92,12 +105,13 @@ missing_values_chart(raw_profile, "missing.png")
    histograms, and categorical bar charts, skipped individually when
    there's nothing meaningful to show (e.g. no missing data, no
    numeric columns).
-5. **Narrate** (`glance.narrate`, optional) — one Claude Haiku call
-   that turns the profile and cleaning report into a short paragraph.
-   Only aggregate statistics are ever sent — column names, dtypes,
-   percentages, summary stats, cleaning step descriptions. Raw rows
-   never leave your machine. With no API key configured this is a
-   no-op; nothing else depends on it.
+5. **Narrate** (`glance.narrate`, optional) — one call to a local
+   Ollama model that turns the profile and cleaning report into a
+   short paragraph. Only aggregate statistics are ever sent — column
+   names, dtypes, percentages, summary stats, cleaning step
+   descriptions — and since the model runs on your machine, nothing
+   leaves it at all. With no model name given this is a no-op; nothing
+   else depends on it.
 6. **Report** (`glance.report`) — assembles all of the above into one
    `report.md`, with charts referenced by relative filename so the
    output directory stays portable if you move or zip it.
@@ -105,7 +119,7 @@ missing_values_chart(raw_profile, "missing.png")
 ## Development
 
 ```bash
-pip install -e ".[dev,excel,narrate]"
+pip install -e ".[dev,excel]"
 ruff check .
 ruff format --check .
 pytest

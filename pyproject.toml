@@ -21,7 +21,6 @@ dependencies = [
 
 [project.optional-dependencies]
 excel = ["openpyxl>=3.1"]
-narrate = ["anthropic>=0.40"]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",

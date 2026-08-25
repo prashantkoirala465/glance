@@ -62,35 +62,20 @@ def test_report_has_no_summary_section_without_narrator(tmp_path):
 
 
 def test_report_has_no_summary_section_with_disabled_narrator(tmp_path):
-    report_path = generate(_messy_df(), tmp_path, narrator=Narrator(api_key=None))
+    report_path = generate(_messy_df(), tmp_path, narrator=Narrator(model=None))
     text = report_path.read_text()
 
     assert "## Summary" not in text
 
 
-class _FakeMessages:
-    def create(self, **_kwargs):
-        from types import SimpleNamespace
-
-        return SimpleNamespace(
-            content=[SimpleNamespace(type="text", text="This dataset looks fine overall.")]
-        )
-
-
-class _FakeClient:
-    def __init__(self):
-        self.messages = _FakeMessages()
-
-
-def test_report_includes_summary_section_with_enabled_narrator(tmp_path):
-    narrator = Narrator(api_key=None)
-    narrator._client = _FakeClient()
+def test_report_includes_summary_section_with_enabled_narrator(tmp_path, mock_ollama_url):
+    narrator = Narrator(model="llama3.2", host=mock_ollama_url)
 
     report_path = generate(_messy_df(), tmp_path, narrator=narrator)
     text = report_path.read_text()
 
     assert "## Summary" in text
-    assert "This dataset looks fine overall." in text
+    assert "This dataset looks mostly clean" in text
 
 
 def test_generate_creates_output_dir_if_missing(tmp_path):

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from glance.cleaning import MISSING_STRATEGIES
 from glance.loading import UnsupportedFormatError, load
-from glance.narrate import Narrator
+from glance.narrate import Narrator, OllamaUnavailableError
 from glance.report import generate
 
 
@@ -35,12 +35,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--narrate",
-        action="store_true",
-        help="add an AI-written summary paragraph (requires an Anthropic API key)",
+        metavar="MODEL",
+        help="add an AI-written summary using a local Ollama model, e.g. --narrate llama3.2 "
+        "(requires Ollama running locally: https://ollama.com)",
     )
     parser.add_argument(
-        "--api-key",
-        help="Anthropic API key for --narrate (default: the ANTHROPIC_API_KEY env var)",
+        "--ollama-host",
+        default=os.environ.get("OLLAMA_HOST", "http://localhost:11434"),
+        help="Ollama server URL for --narrate (default: http://localhost:11434, or $OLLAMA_HOST)",
     )
     return parser
 
@@ -60,20 +62,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"glance: {exc}", file=sys.stderr)
         return 1
 
-    narrator = None
-    if args.narrate:
-        api_key = args.api_key or os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            print(
-                "glance: --narrate requires an API key (--api-key or ANTHROPIC_API_KEY); "
-                "continuing without a summary",
-                file=sys.stderr,
-            )
-        narrator = Narrator(api_key=api_key)
+    narrator = Narrator(model=args.narrate, host=args.ollama_host) if args.narrate else None
 
-    report_path = generate(
-        df, output_dir, missing_strategy=args.missing_strategy, narrator=narrator
-    )
+    try:
+        report_path = generate(
+            df, output_dir, missing_strategy=args.missing_strategy, narrator=narrator
+        )
+    except OllamaUnavailableError as exc:
+        print(f"glance: {exc}; continuing without a summary", file=sys.stderr)
+        report_path = generate(df, output_dir, missing_strategy=args.missing_strategy)
 
     print(f"Rows: {len(df)}, Columns: {len(df.columns)}")
     print(f"Report written to {report_path}")

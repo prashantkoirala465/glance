@@ -57,19 +57,49 @@ def test_main_returns_error_for_unsupported_extension(tmp_path, capsys):
     assert "don't know how to read" in err
 
 
-def test_main_narrate_without_api_key_warns_but_still_succeeds(
-    messy_csv, tmp_path, capsys, monkeypatch
-):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_main_narrate_generates_summary_via_local_ollama(messy_csv, tmp_path, mock_ollama_url):
     output_dir = tmp_path / "out"
 
-    exit_code = main([str(messy_csv), "-o", str(output_dir), "--narrate"])
+    exit_code = main(
+        [
+            str(messy_csv),
+            "-o",
+            str(output_dir),
+            "--narrate",
+            "llama3.2",
+            "--ollama-host",
+            mock_ollama_url,
+        ]
+    )
+
+    report_text = (output_dir / "report.md").read_text()
+
+    assert exit_code == 0
+    assert "## Summary" in report_text
+
+
+def test_main_narrate_falls_back_when_ollama_unreachable(
+    messy_csv, tmp_path, capsys, unreachable_ollama_url
+):
+    output_dir = tmp_path / "out"
+
+    exit_code = main(
+        [
+            str(messy_csv),
+            "-o",
+            str(output_dir),
+            "--narrate",
+            "llama3.2",
+            "--ollama-host",
+            unreachable_ollama_url,
+        ]
+    )
 
     err = capsys.readouterr().err
     report_text = (output_dir / "report.md").read_text()
 
     assert exit_code == 0
-    assert "requires an API key" in err
+    assert "couldn't reach Ollama" in err
     assert "## Summary" not in report_text
 
 

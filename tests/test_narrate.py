@@ -1,8 +1,11 @@
-from types import SimpleNamespace
+import pytest
 
 from glance.cleaning import CleaningReport, CleanStepResult
-from glance.narrate import Narrator, _extract_text, build_prompt
+from glance.narrate import Narrator, OllamaUnavailableError, build_prompt
 from glance.profiling import ColumnProfile, DatasetProfile
+
+# Kept in sync with conftest.py's _MockOllamaHandler response body.
+_MOCK_OLLAMA_REPLY = "This dataset looks mostly clean, with one column worth a second look."
 
 
 def _sample_profile() -> DatasetProfile:
@@ -50,8 +53,8 @@ def _sample_cleaning_report() -> CleaningReport:
     )
 
 
-def test_narrator_disabled_without_api_key():
-    narrator = Narrator(api_key=None)
+def test_narrator_disabled_without_model():
+    narrator = Narrator(model=None)
 
     assert not narrator.enabled
     assert narrator.narrate(_sample_profile(), _sample_cleaning_report()) is None
@@ -88,50 +91,16 @@ def test_build_prompt_includes_cleaning_steps():
     assert "handle_missing_values" in prompt
 
 
-def test_extract_text_from_text_block():
-    response = SimpleNamespace(content=[SimpleNamespace(type="text", text="hello")])
-    assert _extract_text(response) == "hello"
-
-
-def test_extract_text_skips_non_text_blocks():
-    response = SimpleNamespace(
-        content=[
-            SimpleNamespace(type="tool_use", text=None),
-            SimpleNamespace(type="text", text="the actual summary"),
-        ]
-    )
-    assert _extract_text(response) == "the actual summary"
-
-
-def test_extract_text_no_text_block_returns_empty_string():
-    response = SimpleNamespace(content=[])
-    assert _extract_text(response) == ""
-
-
-class _FakeMessages:
-    def __init__(self, response):
-        self._response = response
-        self.last_call_kwargs = None
-
-    def create(self, **kwargs):
-        self.last_call_kwargs = kwargs
-        return self._response
-
-
-class _FakeClient:
-    def __init__(self, response):
-        self.messages = _FakeMessages(response)
-
-
-def test_narrate_calls_client_with_expected_model_and_extracts_result():
-    narrator = Narrator(api_key=None)  # avoid constructing a real client
-    fake_response = SimpleNamespace(
-        content=[SimpleNamespace(type="text", text="This dataset has 10 rows.")]
-    )
-    narrator._client = _FakeClient(fake_response)  # inject the fake
+def test_narrate_calls_local_ollama_server_and_returns_response(mock_ollama_url):
+    narrator = Narrator(model="llama3.2", host=mock_ollama_url)
 
     result = narrator.narrate(_sample_profile(), _sample_cleaning_report())
 
-    assert result == "This dataset has 10 rows."
-    assert narrator._client.messages.last_call_kwargs["model"] == "claude-haiku-4-5-20251001"
-    assert narrator._client.messages.last_call_kwargs["max_tokens"] == 500
+    assert result == _MOCK_OLLAMA_REPLY
+
+
+def test_narrate_raises_when_ollama_unreachable(unreachable_ollama_url):
+    narrator = Narrator(model="llama3.2", host=unreachable_ollama_url)
+
+    with pytest.raises(OllamaUnavailableError, match="couldn't reach Ollama"):
+        narrator.narrate(_sample_profile(), _sample_cleaning_report())
