@@ -1,0 +1,25 @@
+Order ID,Customer Name ,Region,Amount,Order Date
+1001,Alice Johnson,West,250.00,2026-01-05
+1002, Bob Smith,East,175.50,2026-01-06
+1002, Bob Smith,East,175.50,2026-01-06
+1003,Carla Diaz,West,,2026-01-06
+1004,Dave  Lee,South,320.75,2026-01-07
+1005,Eve Turner,North,98.20,2026-01-08
+1006,Frank Osei,West,410.00,2026-01-08
+1007,Grace Kim,,215.30,2026-01-09
+1008,Henry Cole,East,,2026-01-09
+1009,Ivy Chen,South,150.00,2026-01-10
+1010,Jack Ward,North,9999.99,2026-01-10
+1011,Karen Ng,West,275.40,2026-01-11
+1012,Liam Ortiz,East,132.10,2026-01-11
+1013,Mona Patel,South,188.60,2026-01-12
+1014,Nate Brooks,North,244.90,2026-01-12
+1015,Olive Park,West,199.99,2026-01-13
+1016,Paul Reyes,East,310.20,2026-01-13
+1017,Quinn Alva,South,,2026-01-14
+1018,Rita Nash,North,265.75,2026-01-14
+1019,Sam Torres,West,140.00,2026-01-15
+1020,Tara Boone,East,199.00,2026-01-16
+1021,Umar Siddiqui,South,178.40,2026-01-16
+1022,Vera Holt,North,203.10,2026-01-17
+1023,Wade Ellis,West,,2026-01-17
