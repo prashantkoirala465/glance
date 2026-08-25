@@ -67,6 +67,42 @@ environment variable.
 Missing values are filled with the column's median/mode by default.
 Pass `--missing-strategy drop` to drop incomplete rows instead.
 
+## Example output
+
+`glance examples/messy_sales.csv --narrate llama3.2` writes a report
+that starts like this:
+
+> ## Summary
+>
+> This dataset contains customer order records — order IDs, customer
+> names, regions, amounts, and order dates. It has 24 rows and 5
+> columns. One row was an exact duplicate and got dropped during
+> cleaning. The `amount` column has a couple of values far outside the
+> rest of the distribution, and both it and `region` had some missing
+> values that were filled in with the median and mode respectively
+> before analysis.
+>
+> ## Overview
+>
+> - Rows: 24
+> - Columns: 5
+> - Duplicate rows found: 1
+>
+> ## Cleaning
+>
+> | Step | What changed |
+> | --- | --- |
+> | normalize_column_names | renamed 5 column(s) to lowercase snake_case |
+> | strip_whitespace | stripped leading/trailing whitespace from 2 cell(s) across 1 text column(s) |
+> | drop_duplicate_rows | dropped 1 exact duplicate row(s) |
+> | handle_missing_values | filled missing values in 'region' (1 filled with mode 'West'); 'amount' (4 filled with median 203.10) |
+
+...followed by a per-column stats table, a missing-values chart,
+numeric histograms, and categorical bar charts. The summary paragraph
+above is lightly edited for length — the exact wording will vary by
+model; smaller models (like `llama3.2:1b`) produce rougher summaries
+than larger ones.
+
 ## Library usage
 
 Every CLI step is a plain function you can call directly:
