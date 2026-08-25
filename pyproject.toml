@@ -10,7 +10,11 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
-    "pandas>=2.2",
+    # Capped below 3.0 deliberately: pandas 3's string-dtype migration
+    # is still in progress across the ecosystem (matplotlib, numpy
+    # interop) as of writing. Pin to the stable 2.x line rather than
+    # writing code against a moving target.
+    "pandas>=2.2,<3.0",
     "numpy>=1.26",
     "matplotlib>=3.8",
 ]
